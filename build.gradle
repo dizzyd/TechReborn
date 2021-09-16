@@ -15,6 +15,7 @@ plugins {
 	id "fabric-loom" version "0.9-SNAPSHOT"
 	id "com.matthewprenger.cursegradle" version "1.4.0"
 	id "de.undercouch.download" version "4.1.1"
+    id "com.palantir.git-version" version "0.12.3"
 }
 
 repositories {
@@ -80,8 +81,13 @@ license {
 group = 'TechReborn'
 
 allprojects {
-    def build_number = ENV.BUILD_NUMBER ?: "local"
-    version = "project.$mod_version+build.$build_number"
+    def versionInfo = versionDetails()
+    if (versionInfo.isCleanTag) {
+        version = "${versionInfo.lastTag}-${versionInfo.gitHash}"
+    } else {
+        version = "${versionInfo.lastTag}-${versionInfo.gitHash}-dirty"
+    }
+
 
     apply plugin: "fabric-loom"
     apply plugin: "maven-publish"
@@ -109,7 +115,7 @@ allprojects {
         inputs.property "version", project.version
 
         filesMatching("fabric.mod.json") {
-            expand "version": project.version
+            expand "version": project.mod_version
         }
     }
 
@@ -126,7 +132,7 @@ allprojects {
         publications {
             maven(MavenPublication) {
                 groupId project.name
-                artifactId project.archivesBaseName  + "-" + getBranch()
+                artifactId project.archivesBaseName
                 version project.version
 
                 artifact(remapJar) {
@@ -138,13 +144,11 @@ allprojects {
             }
         }
         repositories {
-            if (ENV.MAVEN_URL) {
-                maven {
-                    url ENV.MAVEN_URL
-                    credentials {
-                        username ENV.MAVEN_USERNAME
-                        password ENV.MAVEN_PASSWORD
-                    }
+            maven {
+                url "s3://files.mcdex.net/maven2"
+                credentials(AwsCredentials) {
+                    accessKey = ENV.AWS_ACCESS_KEY_ID
+                    secretKey = ENV.AWS_SECRET_ACCESS_KEY
                 }
             }
         }
